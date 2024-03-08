@@ -1,5 +1,6 @@
 // import mongodb from 'mongodb';
 const { MongoClient } = require('mongodb');
+const process = require('process')
 // import { MongoClient } from 'mongodb/lib/mongo_client';
 // import Collection from 'mongodb/lib/collection';
 // import envLoader from './env_loader';
