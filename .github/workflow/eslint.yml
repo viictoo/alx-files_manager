@@ -4,7 +4,7 @@ on:
   push:
 
 jobs:
-  prettier:
+  eslint:
     runs-on: ubuntu-latest
 
     steps:
@@ -13,10 +13,14 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
+      - name: Install ESLint
+        run: |
+          npm install eslint@8.10.0
+
       - name: Run ESLint
         uses: permafrost-dev/eslint-docker-ga@main
         with:
-          args: --fix *.js
+          args: --fix --ext js .
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v4
