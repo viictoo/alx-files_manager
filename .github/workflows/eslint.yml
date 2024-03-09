@@ -13,10 +13,6 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
-      - name: Install ESLint
-        run: |
-          npm install eslint@"6.4.0"
-
       - name: Run ESLint
         uses: permafrost-dev/eslint-docker-ga@main
         with:
