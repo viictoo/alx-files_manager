@@ -4,7 +4,7 @@ on:
   push:
 
 jobs:
-  eslint:
+  prettier:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,9 +16,9 @@ jobs:
       - name: Run ESLint
         uses: permafrost-dev/eslint-docker-ga@main
         with:
-          args: --fix --ext js .
+          args: --fix .
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: fix styling
+          commit_message: Fix styling
