@@ -1,24 +1,29 @@
-name: Check & fix styling (eslint)
+name: Lint
 
-on:
-  push:
+on: push
 
 jobs:
-  prettier:
+ run-linters:
+    name: Run linters
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Check out Git repository
         uses: actions/checkout@v2
-        with:
-          ref: ${{ github.head_ref }}
 
-      - name: Run ESLint
-        uses: permafrost-dev/eslint-docker-ga@main
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
         with:
-          args: --fix .
+          node-version: '20'
 
-      - name: Commit changes
-        uses: stefanzweifel/git-auto-commit-action@v4
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install ESLint and plugins
+        run: npm install eslint eslint-config-airbnb-base eslint-plugin-jest --save-dev
+
+      - name: Run linters
+        uses: samuelmeuli/lint-action@v1
         with:
-          commit_message: Fix styling
+          github_token: ${{ secrets.github_token }}
+          eslint_config_file: .eslintrc.js
