@@ -7,7 +7,7 @@ const sha1 = require('sha1');
 class UsersController {
   static postNew(request, response) {
     const { email } = request.body;
-    let { password } = request.body;
+    const { password } = request.body;
 
     if (!email) {
       response.status(400).json({ error: 'Missing email' });
@@ -23,12 +23,12 @@ class UsersController {
       if (user) {
         response.status(400).json({ error: 'Already exist' });
       } else {
-        password = sha1(password);
-        users.insertOne({ email, password })
-          .then((result) => {
-            console.log(`user added to database ${result}`);
-            response.status(201).json({ id: result.insertedId, email });
-          }).catch((error) => console.error(error));
+        const hashpassword = sha1(password);
+        users.insertOne({ email, password: hashpassword })
+          .then((newUser) => {
+            console.log(`user added to database ${newUser}`);
+            response.status(201).json({ id: newUser.insertedId, email });
+          })
       }
     });
   }
