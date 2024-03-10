@@ -3,17 +3,22 @@ const { MongoClient } = require('mongodb');
 // import { MongoClient } from 'mongodb/lib/mongo_client';
 // import Collection from 'mongodb/lib/collection';
 // import envLoader from './env_loader';
+const host = process.env.DB_HOST || 'localhost';
+const port = +(process.env.DB_PORT) || 27017;
+const dbName = process.env.DB_DATABASE || 'files_manager';
+const url = `mongodb://${host}:${port}/${dbName}`;
 
 class DBClient {
   constructor() {
     // envLoader();
-    const host = process.env.DB_HOST || 'localhost';
-    const port = +(process.env.DB_PORT) || 27017;
-    const dbName = process.env.DB_DATABASE || 'files_manager';
-    const url = `mongodb://${host}:${port}/${dbName}`;
-
     this.client = new MongoClient(url, { useUnifiedTopology: true });
-    this.client.connect();
+    this.client.connect().then(() => {
+      // console.log(`db ${this.client.isConnected()}`);
+      console.log(this.client.isConnected());
+      this.db = this.client.db(dbName);
+    }).catch((err) => {
+      console.log(err);
+    });
   }
 
   // returns true when the connection to MongoDB is a success otherwise, false
@@ -43,5 +48,4 @@ class DBClient {
 }
 
 // create and export an instance of DBClient called dbClient
-export const dbClient = new DBClient();
-export default dbClient;
+module.exports = new DBClient();

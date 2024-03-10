@@ -25,19 +25,20 @@ import { createClient } from 'redis';
 class RedisClient {
   constructor() {
     this.client = createClient();
-    this.isClientConnected = true;
+    // this.isClientConnected = true;
     this.client.on('error', (err) => {
       console.error('Redis client failed to connect:', err.message || err.toString());
-      this.isClientConnected = false;
+      // this.isClientConnected = false;
     });
     this.client.on('connect', () => {
-      this.isClientConnected = true;
+      console.log(this.client.connected);
+      // this.client.connected = true;
     });
   }
 
   //  returns true when the connection to Redis is a success otherwise, false
   isAlive() {
-    return this.isClientConnected;
+    return this.client.connected;
   }
 
   //  takes a string key as argument and returns the Redis value stored for this key
@@ -61,5 +62,5 @@ class RedisClient {
   }
 }
 
-export const redisClient = new RedisClient();
-export default redisClient;
+const redisClient = new RedisClient();
+module.exports = redisClient;
