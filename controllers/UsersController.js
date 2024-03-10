@@ -28,31 +28,26 @@ class UsersController {
           .then((newUser) => {
             console.log(`user added to database ${newUser}`);
             response.status(201).json({ id: newUser.insertedId, email });
-          })
+          }).catch((error) => console.error(error));
       }
     });
   }
 
   static async getMe(request, response) {
-    const token = request.headers['x-token'];
-    if (!token) {
-      return response.status(401).json({ error: 'Unauthorized' });
-    }
-    console.log(` token ===  ${token}`);
+    const token = request.headers('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
     if (!userId) {
-      return response.status(401).json({ error: 'Unauthorized' });
+      response.status(401).json({ error: 'Unauthorized' });
+      return;
     }
-    console.log(` user ID ===  ${userId}`);
 
     const idObject = new ObjectID(userId);
     const user = await dbClient.db.collection('users').findOne({ _id: idObject });
     if (!user) {
-      return response.status(401).json({ error: 'Unauthorized' });
+      response.status(401).json({ error: 'Unauthorized' });
+      return;
     }
-    console.log(` user ===  ${user}`);
-
-    return response.status(200).json({ email: user.email, id: user._id });
+    response.status(200).json({ id: user._id, email: user.email });
   }
 }
 
