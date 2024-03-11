@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { promises as fs } from 'fs';
 import { ObjectID } from 'mongodb';
 import Queue from 'bull';
+import mime from 'mime-types';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
@@ -154,6 +155,16 @@ class FilesController {
     if (!file) return response.status(404).json({ error: 'Not found' });
     return response.status(200).json(file);
   }
+  /**
+   * @api {put} /files/:id/publish set isPublic to true on the file document based on the ID
+   * @apiName putPublish
+   * @apiGroup FilesController
+   *
+   * @apiParam {Number} id file document's unique ID.
+   *
+   * @apiSuccess {String} Update the value of isPublic to true.
+   * @apiSuccess {json} file document with a status code 200.
+   */
 
   static async putPublish(request, response) {
     const user = await FilesController.getUser(request);
@@ -171,6 +182,16 @@ class FilesController {
     });
     return null;
   }
+  /**
+   * @api {put} /files/:id/unpublish set isPublic to true on the file document based on the ID
+   * @apiName putUnpublish
+   * @apiGroup FilesController
+   *
+   * @apiParam {Number} id file document's unique ID.
+   *
+   * @apiSuccess {String} Update the value of isPublic to false.
+   * @apiSuccess {json} file document with a status code 200.
+   */
 
   static async putUnpublish(request, response) {
     const user = await FilesController.getUser(request);
@@ -189,6 +210,60 @@ class FilesController {
       return response.status(200).json(file.value);
     });
     return null;
+  }
+  /**
+   * @api {get} /files/:id/data return the content of the file document based on the ID
+   * @apiName getFile
+   * @apiGroup FilesController
+   *
+   * @apiParam {Number} id file document's unique ID.
+   *
+   * @apiSuccess {String} Return the content of the file with the correct MIME-type.
+   * @apiSuccess {Number} status code 200.
+   */
+
+  static async getFile(request, response) {
+    const { id } = request.params;
+    const size = request.param('size');
+    console.log(id);
+    const files = dbClient.db.collection('files');
+    const mongoID = new ObjectID(id);
+    files.findOne({ _id: mongoID }, async (err, file) => {
+      if (!file) return response.status(404).json({ error: 'Not found' });
+
+      // console.log(file.localPath);
+      if (file.isPublic) {
+        if (file.type === 'folder') return response.status(400).json({ error: "A folder doesn't have content" });
+        await FilesController.sendFile(file, size, response);
+      } else {
+        const user = await FilesController.getUser(request);
+        if (!user) {
+          return response.status(404).json({ error: 'Not found' });
+        }
+        if (file.userId.toString() === user._id.toString()) {
+          if (file.type === 'folder') {
+            return response.status(400).json({ error: "A folder doesn't have content" });
+          }
+          await FilesController.sendFile(file, size, response);
+        } else return response.status(404).json({ error: 'Not found' });
+      }
+      return null;
+    });
+    // return null;
+  }
+
+  static async sendFile(file, size, response) {
+    let fileName = file.localPath;
+    if (size) fileName = `${file.localPath}_${size}`;
+
+    try {
+      const data = await fs.readFile(fileName);
+      const contentType = mime.contentType(file.name);
+      return response.header('Content-Type', contentType).status(200).send(data);
+    } catch (error) {
+      console.log(error);
+      return response.status(404).json({ error: 'Not found' });
+    }
   }
 }
 
