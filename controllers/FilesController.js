@@ -28,11 +28,11 @@ class FilesController {
     if (!user) {
       res.status(401).json({ error: 'Unauthorized' });
     }
-    const { name } = req.body;
-    const { type } = req.body;
-    const { parentId } = req.body;
-    const { isPublic = false } = req.body.isPublic;
-    const { data } = req.body;
+    // null !== undefined destructuring may not always work accurately
+    const isPublic = req.body.isPublic || false;
+    const {
+      name, type, parentId, data,
+    } = req.body;
 
     if (!name) {
       res.status(400).json({ error: 'Missing name' });
