@@ -94,17 +94,22 @@ class FilesController {
 
   static async getIndex(request, response) {
     const user = await FilesController.getUser(request);
-    const userId = user._id;
+    if (!user) {
+      return response.status(401).json({ error: 'Unauthorized' });
+    }
     // console.log(`user id  = ${userId}`);
-    if (!userId) return response.status(401).json({ error: 'Unauthorized' });
+    if (!user) return response.status(401).json({ error: 'Unauthorized' });
     const {
       parentId, page,
     } = request.query;
     const pageNum = page || 0;
     const dbfiles = dbClient.db.collection('files');
+    const userId = user._id;
     let query;
-    if (!parentId) query = { userId };
-    else query = { userId, parentId: ObjectID(parentId) };
+    if (!parentId) {
+      query = { userId };
+    } else query = { userId, parentId: ObjectID(parentId) };
+    console.log(`query string === ${parentId}`);
     dbfiles.aggregate([
       { $match: query },
       { $sort: { _id: -1 } },
@@ -136,9 +141,12 @@ class FilesController {
 
   static async getShow(request, response) {
     const user = await FilesController.getUser(request);
-    const userId = user._id;
+    if (!user) {
+      return response.status(401).json({ error: 'Unauthorized' });
+    }
     // console.log(`user id  = ${userId}`);
-    if (!userId) return response.status(401).json({ error: 'Unauthorized' });
+    if (!user) return response.status(401).json({ error: 'Unauthorized' });
+    const userId = user._id;
     const fileId = request.params.id;
     const files = dbClient.db.collection('files');
     const mongoid = new ObjectID(fileId);
