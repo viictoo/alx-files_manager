@@ -1,19 +1,23 @@
-import { ObjectID } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import { promises as fs } from 'fs';
+import { ObjectID } from 'mongodb';
+import Queue from 'bull';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
+const fileQueue = new Queue('fileQueue', 'redis://127.0.0.1:6379');
 class FilesController {
-  static async getUser(request) {
-    const token = request.header('X-Token');
+  static async getUser(req) {
+    const token = req.header('X-Token');
     const key = `auth_${token}`;
-    const sessionID = await redisClient.get(key);
-    if (sessionID) {
+    const id = await redisClient.get(key);
+    if (id) {
       const users = dbClient.db.collection('users');
-      const mongoID = new ObjectID(sessionID);
-      const user = users.findOne({ _id: mongoID });
-      if (user) return user;
+      const idObject = new ObjectID(id);
+      const user = users.findOne({ _id: idObject });
+      if (user) {
+        return user;
+      }
       return null;
     }
     return null;
@@ -24,12 +28,11 @@ class FilesController {
     if (!user) {
       res.status(401).json({ error: 'Unauthorized' });
     }
-    // eslint demands new line object-curly-newline: ["error", "never"]
-    const {
-      name, parentId, type, data,
-    } = req.body;
-    // TODO: figure why this doesnt register
-    const isPublic = req.body.isPublic || false;
+    const { name } = req.body;
+    const { type } = req.body;
+    const { parentId } = req.body;
+    const { isPublic = false } = req.body.isPublic;
+    const { data } = req.body;
 
     if (!name) {
       res.status(400).json({ error: 'Missing name' });
@@ -41,93 +44,121 @@ class FilesController {
       res.status(400).json({ error: 'Missing data' });
     }
 
-    const dbfiles = dbClient.db.collection('files');
+    const files = dbClient.db.collection('files');
     if (parentId) {
-      const mongoID = new ObjectID(parentId);
-      const file = await dbfiles.findOne({ _id: mongoID });
-      if (!file) {
+      const parentObject = new ObjectID(parentId);
+      const parent = await files.findOne({ _id: parentObject });
+      if (!parent) {
         res.status(400).json({ error: 'Parent not found' });
       }
-      console.log(file);
-      if (file.type !== 'folder') {
+      if (parent.type !== 'folder') {
         res.status(400).json({ error: 'Parent is not a folder' });
       }
     }
 
     if (type === 'folder') {
-      dbfiles.insertOne({
-        userId: user._id,
+      files.insertOne({
         name,
         type,
-        isPublic,
         parentId: parentId || 0,
-      }).then((file) => {
+        isPublic,
+        userId: user._id,
+      }).then((result) => {
         res.status(201).json({
-          id: file.insertedId,
+          id: result.insertedId,
           userId: user._id,
           name,
           type,
-          isPublic,
+          isPublic: isPublic || false,
           parentId: parentId || 0,
         });
       }).catch((error) => console.log(error));
     } else {
-      const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
-      const fileName = `${folderPath}/${uuidv4()}`;
-      const cleanData = Buffer.from(data, 'base64');
+      const filePath = process.env.FOLDER_PATH || '/tmp/files_manager';
+      const fileName = `${filePath}/${uuidv4()}`;
+      const buff = Buffer.from(data, 'base64');
 
       try {
         try {
-          await fs.mkdir(folderPath, { recursive: true });
+          await fs.mkdir(filePath, { recursive: true });
         } catch (error) {
-          console.error(`file exists ${error}`);
+          console.log(error);
         }
-        await fs.writeFile(fileName, cleanData, 'utf-8');
+        await fs.writeFile(fileName, buff, 'utf-8');
       } catch (error) {
-        // console.log(error);
+        console.log(error);
       }
 
-      dbfiles.insertOne(
-        {
+      files.insertOne({
+        name,
+        type,
+        parentId: parentId || 0,
+        isPublic,
+        userId: user._id,
+        localPath: fileName,
+      }).then((result) => {
+        res.status(201).json({
+          id: result.insertedId,
           userId: user._id,
           name,
           type,
-          isPublic,
+          isPublic: isPublic || false,
           parentId: parentId || 0,
-          localPath: fileName,
-        },
-      ).then((result) => {
-        res.status(201).json(
-          {
-            id: result.insertedId,
-            userId: user._id,
-            name,
-            type,
-            isPublic,
-            parentId: parentId || 0,
-          },
-        );
+        });
+
+        if (type === 'image') {
+          fileQueue.add({ userId: user._id, fileId: result.insertedId });
+        }
       }).catch((error) => console.log(error));
     }
     return null;
   }
 
-  static async getIndex(req, res) {
-    const token = req.header('X-Token');
-    const key = `auth_${token}`;
-    const userId = await redisClient.get(key);
-    if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+  static async getIndex(request, response) {
+    const user = await FilesController.getUser(request);
+    if (!user) {
+      return response.status(401).json({ error: 'Unauthorized' });
     }
-    const { parentId = 0, page = 0 } = req.query;
+    const {
+      parentId,
+      page,
+    } = request.query;
+    const pageNum = page || 0;
     const files = dbClient.db.collection('files');
-    const result = await files.aggregate([
-      { $match: { userId, parentId: new ObjectID(parentId) } },
-      { $skip: page * 20 },
-      { $limit: 20 },
-    ]).toArray();
-    res.status(200).json(result);
+    let query;
+    if (!parentId) {
+      query = { userId: user._id };
+    } else {
+      query = { userId: user._id, parentId: ObjectID(parentId) };
+    }
+    files.aggregate(
+      [
+        { $match: query },
+        { $sort: { _id: -1 } },
+        {
+          $facet: {
+            metadata: [{ $count: 'total' }, { $addFields: { page: parseInt(pageNum, 10) } }],
+            data: [{ $skip: 20 * parseInt(pageNum, 10) }, { $limit: 20 }],
+          },
+        },
+      ],
+    ).toArray((err, result) => {
+      if (result) {
+        const final = result[0].data.map((file) => {
+          const tmpFile = {
+            ...file,
+            id: file._id,
+          };
+          delete tmpFile._id;
+          delete tmpFile.localPath;
+          return tmpFile;
+        });
+        return response.status(200).json(final);
+      }
+      console.log('Error occured');
+      return response.status(404).json({ error: 'Not found' });
+    });
+    return null;
   }
 
   static async getShow(request, response) {
@@ -135,11 +166,13 @@ class FilesController {
     if (!user) {
       return response.status(401).json({ error: 'Unauthorized' });
     }
-    const { id } = request.params;
+    const fileId = request.params.id;
     const files = dbClient.db.collection('files');
-    const mongoID = new ObjectID(id);
-    const file = await files.findOne({ _id: mongoID, userId: user._id });
-    if (!file) return response.status(404).json({ error: 'Not found' });
+    const idObject = new ObjectID(fileId);
+    const file = await files.findOne({ _id: idObject, userId: user._id });
+    if (!file) {
+      return response.status(404).json({ error: 'Not found' });
+    }
     return response.status(200).json(file);
   }
 }
