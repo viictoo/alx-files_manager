@@ -28,7 +28,8 @@ class FilesController {
     const {
       name, parentId, type, data,
     } = req.body;
-    const { isPublic } = req.body.isPublic || false;
+    // TODO: figure why this doesnt register
+    const isPublic = req.body.isPublic || false;
 
     if (!name) {
       res.status(400).json({ error: 'Missing name' });
@@ -42,12 +43,13 @@ class FilesController {
 
     const dbfiles = dbClient.db.collection('files');
     if (parentId) {
-      const mongoObj = new ObjectID(parentId);
-      const parent = await dbfiles.findOne({ _id: mongoObj });
-      if (!parent) {
+      const mongoID = new ObjectID(parentId);
+      const file = await dbfiles.findOne({ _id: mongoID });
+      if (!file) {
         res.status(400).json({ error: 'Parent not found' });
       }
-      if (parent.type !== 'folder') {
+      console.log(file);
+      if (file.type !== 'folder') {
         res.status(400).json({ error: 'Parent is not a folder' });
       }
     }
@@ -57,8 +59,8 @@ class FilesController {
         userId: user._id,
         name,
         type,
-        parentId: parentId || 0,
         isPublic,
+        parentId: parentId || 0,
       }).then((file) => {
         res.status(201).json({
           id: file.insertedId,
@@ -70,37 +72,41 @@ class FilesController {
         });
       }).catch((error) => console.log(error));
     } else {
-      const filePath = process.env.FOLDER_PATH || '/tmp/files_manager';
-      const fileName = `${filePath}/${uuidv4()}`;
-      const buff = Buffer.from(data, 'base64');
+      const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
+      const fileName = `${folderPath}/${uuidv4()}`;
+      const cleanData = Buffer.from(data, 'base64');
 
       try {
         try {
-          await fs.mkdir(filePath, { recursive: true });
+          await fs.mkdir(folderPath, { recursive: true });
         } catch (error) {
           console.error(`file exists ${error}`);
         }
-        await fs.writeFile(fileName, buff, 'utf-8');
+        await fs.writeFile(fileName, cleanData, 'utf-8');
       } catch (error) {
-        console.log(error);
+        // console.log(error);
       }
 
-      dbfiles.insertOne({
-        userId: user._id,
-        name,
-        type,
-        parentId: parentId || 0,
-        isPublic,
-        localPath: fileName,
-      }).then((result) => {
-        res.status(201).json({
-          id: result.insertedId,
+      dbfiles.insertOne(
+        {
           userId: user._id,
           name,
           type,
           isPublic,
           parentId: parentId || 0,
-        });
+          localPath: fileName,
+        },
+      ).then((result) => {
+        res.status(201).json(
+          {
+            id: result.insertedId,
+            userId: user._id,
+            name,
+            type,
+            isPublic,
+            parentId: parentId || 0,
+          },
+        );
       }).catch((error) => console.log(error));
     }
     return null;
