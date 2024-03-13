@@ -25,19 +25,19 @@ class FilesController {
 
   static async postUpload(req, res) {
     const user = await FilesController.getUser(req);
-    const userId = user._id;
     // console.log(`user id  = ${userId}`);
-    if (!userId) {
+    if (!user) {
       res.status(401).json({ error: 'Unauthorized' });
     }
+    const userId = user._id;
     const {
       name, type, parentId, data,
     } = req.body;
     const { isPublic } = req.body.isPublic || false;
 
-    if (!name) res.status(400).json({ error: 'Missing name' });
-    if (!type) res.status(400).json({ error: 'Missing type' });
-    if (!data && type !== 'folder') res.status(400).json({ error: 'Missing data' });
+    if (!name) return res.status(400).json({ error: 'Missing name' });
+    if (!type) return res.status(400).json({ error: 'Missing type' });
+    if (!data && type !== 'folder') return res.status(400).json({ error: 'Missing data' });
 
     const files = dbClient.db.collection('files');
     if (parentId) {
@@ -98,8 +98,6 @@ class FilesController {
     if (!user) {
       return response.status(401).json({ error: 'Unauthorized' });
     }
-    // console.log(`user id  = ${userId}`);
-    if (!user) return response.status(401).json({ error: 'Unauthorized' });
     const {
       parentId, page,
     } = request.query;
@@ -145,8 +143,6 @@ class FilesController {
     if (!user) {
       return response.status(401).json({ error: 'Unauthorized' });
     }
-    // console.log(`user id  = ${userId}`);
-    if (!user) return response.status(401).json({ error: 'Unauthorized' });
     const userId = user._id;
     const fileId = request.params.id;
     const files = dbClient.db.collection('files');

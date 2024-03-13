@@ -10,3 +10,4 @@ Change permission of a file
 View a file 
 Generate thumbnails for images
 
+add husky CI
