@@ -26,10 +26,10 @@ class FilesController {
   static async postUpload(req, res) {
     const user = await FilesController.getUser(req);
     // console.log(`user id  = ${userId}`);
-    if (!user) {
-      res.status(401).json({ error: 'Unauthorized' });
+    if (!user || user === null) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-    const userId = user._id;
+
     const {
       name, type, parentId, data,
     } = req.body;
@@ -38,7 +38,8 @@ class FilesController {
     if (!name) return res.status(400).json({ error: 'Missing name' });
     if (!type) return res.status(400).json({ error: 'Missing type' });
     if (!data && type !== 'folder') return res.status(400).json({ error: 'Missing data' });
-
+    // console.log(user);
+    const userId = user._id;
     const files = dbClient.db.collection('files');
     if (parentId) {
       const parentObject = new ObjectID(parentId);
