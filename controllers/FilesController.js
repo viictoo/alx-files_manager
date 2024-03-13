@@ -44,8 +44,8 @@ class FilesController {
     if (parentId) {
       const parentObject = new ObjectID(parentId);
       const parent = await files.findOne({ _id: parentObject });
-      if (!parent) res.status(400).json({ error: 'Parent not found' });
-      if (parent.type !== 'folder') res.status(400).json({ error: 'Parent is not a folder' });
+      if (!parent) return res.status(400).json({ error: 'Parent not found' });
+      if (parent.type !== 'folder') return res.status(400).json({ error: 'Parent is not a folder' });
     }
     if (type === 'folder') {
       files.insertOne({
